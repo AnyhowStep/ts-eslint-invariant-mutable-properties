@@ -60,13 +60,18 @@ const rule = createRule<Options, MessageId>({
             reportMaxPairwiseComparison : true,
 
             maxDepth : 50,
-            maxPairwiseComparison : 100,
+            maxPairwiseComparison : 100000,
         }
     ],
     create (context, options) {
         //For some reason, `context.options` starts out as an empty array?
         const service = getParserServices(context);
         const typeChecker = service.program.getTypeChecker();
+
+        const expanded : Map<string, string[]> = new Map<string, string[]>();
+        const assignabilityCache : {
+            [k:string] : boolean|undefined|Error
+        } = {};
 
         function checkAssignmentPattern (node : TSESTree.AssignmentPattern) : void {
             if (node.right == undefined) {
@@ -77,6 +82,8 @@ const rule = createRule<Options, MessageId>({
             checkAssignment(
                 context,
                 options,
+                expanded,
+                assignabilityCache,
                 typeChecker,
                 node.left,
                 leftNode,
@@ -90,6 +97,8 @@ const rule = createRule<Options, MessageId>({
             checkAssignment(
                 context,
                 options,
+                expanded,
+                assignabilityCache,
                 typeChecker,
                 node.left,
                 leftNode,
@@ -109,6 +118,8 @@ const rule = createRule<Options, MessageId>({
                 checkAssignment(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     decl.id.typeAnnotation,
                     idNode,
@@ -141,6 +152,7 @@ const rule = createRule<Options, MessageId>({
                     const isSubType = isSubTypeOf(
                         context,
                         options,
+                        assignabilityCache,
                         arg,
                         typeChecker.getTypeAtLocation(service.esTreeNodeToTSNodeMap.get(arg)),
                         //This commented out line, if used, causes the invariant-mutable-properties error!
@@ -174,6 +186,8 @@ const rule = createRule<Options, MessageId>({
                         checkAssignment(
                             context,
                             options,
+                            expanded,
+                            assignabilityCache,
                             typeChecker,
                             arg,
                             param.valueDeclaration,

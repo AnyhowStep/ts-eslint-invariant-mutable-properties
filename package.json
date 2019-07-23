@@ -7,7 +7,7 @@
     "test": "ts-node -P ./test/tsconfig.json ./test/src/index.ts",
     "test-one": "ts-node -P ./test/tsconfig.json",
     "build": "tsc",
-    "lint": "eslint --ext ts ./src"
+    "lint": "(date) && (eslint --ext ts ./src) && (date)"
   },
   "author": "",
   "license": "ISC",

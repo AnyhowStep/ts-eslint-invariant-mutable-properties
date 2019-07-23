@@ -26,13 +26,16 @@ import {Options} from "./options";
 export function checkAssignment (
     context : RuleContext<MessageId, Options>,
     options : Options,
+    expanded : Map<string, string[]>,
+    assignabilityCache : {
+        [k:string] : boolean|undefined|Error
+    },
     typeChecker : ts.TypeChecker,
     node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
     dst : TSNode|ts.ObjectType,
     src : TSNode|ts.ObjectType
 ) {
     const offendingProperties : string[] = [];
-    const expanded : Set<string> = new Set<string>();
     const sharedState = {
         earlyExit : false,
         deepestDepth : 0,
@@ -41,13 +44,14 @@ export function checkAssignment (
         checkAssignmentImpl(
             context,
             options,
+            expanded,
+            assignabilityCache,
             typeChecker,
             node,
             dst,
             src,
             [],
             offendingProperties,
-            expanded,
             [],
             [],
             sharedState
@@ -83,16 +87,28 @@ function addOffendingProperty (
         offendingProperties.push(property);
     }
 }
+function addOffendingProperties(
+    offendingProperties : string[],
+    prefix : readonly string[],
+    expandedValue : readonly string[]
+) {
+    for (const expandedProp of expandedValue) {
+        addOffendingProperty(offendingProperties, [...prefix, expandedProp].join("."));
+    }
+}
 function checkAssignmentImpl (
     context : RuleContext<MessageId, Options>,
     options : Options,
+    expanded : Map<string, string[]>,
+    assignabilityCache : {
+        [k:string] : boolean|undefined|Error
+    },
     typeChecker : ts.TypeChecker,
     node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
     dst : TSNode|ts.ObjectType|UnionType|IntersectionType,
     src : TSNode|ts.ObjectType|UnionType|IntersectionType,
     prefix : readonly string[],
     offendingProperties : string[],
-    expanded : Set<string>,
     dstPath : readonly number[],
     srcPath : readonly number[],
     sharedState : {
@@ -174,6 +190,7 @@ function checkAssignmentImpl (
 
     //Special case for union src type
     if (isUnionType(srcType)) {
+        //console.log("srcUnion", srcType.types.length);
         for (const srcTypeEle of srcType.types) {
             if (!isObjectOrUnionOrIntersectionType(srcTypeEle)) {
                 continue;
@@ -181,6 +198,7 @@ function checkAssignmentImpl (
             const isSubType = isSubTypeOf(
                 context,
                 options,
+                assignabilityCache,
                 node,
                 srcTypeEle,
                 dstType,
@@ -194,13 +212,14 @@ function checkAssignmentImpl (
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dst,
                     srcTypeEle,
                     prefix,
                     offendingProperties,
-                    expanded,
                     dstPath,
                     srcPath,
                     sharedState
@@ -219,13 +238,14 @@ function checkAssignmentImpl (
             checkAssignmentImpl(
                 context,
                 options,
+                expanded,
+                assignabilityCache,
                 typeChecker,
                 node,
                 dst,
                 srcTypeEle,
                 prefix,
                 offendingProperties,
-                expanded,
                 dstPath,
                 srcPath,
                 sharedState
@@ -271,6 +291,7 @@ function checkAssignmentImpl (
 
     //Special case for union dst type
     if (isUnionType(dstType)) {
+        //console.log("dstUnion", dstType.types.length);
         const prvSrcPath = srcPath.slice(0, srcPath.length-1);
         for (const dstTypeEle of dstType.types) {
             if (!isObjectOrUnionOrIntersectionType(dstTypeEle)) {
@@ -279,6 +300,7 @@ function checkAssignmentImpl (
             const isSubType = isSubTypeOf(
                 context,
                 options,
+                assignabilityCache,
                 node,
                 srcType,
                 dstTypeEle,
@@ -292,13 +314,14 @@ function checkAssignmentImpl (
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstTypeEle,
                     src,
                     prefix,
                     offendingProperties,
-                    expanded,
                     dstPath,
                     prvSrcPath,
                     sharedState
@@ -318,13 +341,14 @@ function checkAssignmentImpl (
             checkAssignmentImpl(
                 context,
                 options,
+                expanded,
+                assignabilityCache,
                 typeChecker,
                 node,
                 dstTypeEle,
                 src,
                 prefix,
                 offendingProperties,
-                expanded,
                 dstPath,
                 prvSrcPath,
                 sharedState
@@ -339,11 +363,18 @@ function checkAssignmentImpl (
     }
 
     const expandedKey = (srcType as any).id + "-" + (dstType as any).id;
-    if (expanded.has(expandedKey)) {
-        //console.log("Already seen " + expandedKey);
+    let expandedValue = expanded.get(expandedKey);
+    if (expandedValue != undefined) {
+        //console.log("Already seen " + expandedKey, expandedValue);
+        addOffendingProperties(
+            offendingProperties,
+            prefix,
+            expandedValue
+        );
         return;
     }
-    expanded.add(expandedKey);
+    expandedValue = [];
+    expanded.set(expandedKey, expandedValue);
 
     const dstNumberIndexInfo = typeChecker.getIndexInfoOfType(dstType, ts.IndexKind.Number);
     const dstNumberIndexType = dstType.getNumberIndexType();
@@ -358,24 +389,37 @@ function checkAssignmentImpl (
                 isObjectOrUnionOrIntersectionType(dstNumberIndexType) &&
                 isObjectOrUnionOrIntersectionType(srcNumberIndexType)
             ) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstNumberIndexType,
                     srcNumberIndexType,
-                    [...prefix, "[number]"],
-                    offendingProperties,
-                    expanded,
+                    ["[number]"],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     srcNumberIndexType,
                     dstNumberIndexType,
@@ -388,6 +432,7 @@ function checkAssignmentImpl (
                 const dstSubTypeOfSrc = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     dstNumberIndexType,
                     srcNumberIndexType,
@@ -400,6 +445,7 @@ function checkAssignmentImpl (
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
                     addOffendingProperty(offendingProperties, [...prefix].join(".")+"[number]");
+                    addOffendingProperty(expandedValue, "[number]");
                 }
             }
         }
@@ -414,24 +460,37 @@ function checkAssignmentImpl (
                 isObjectOrUnionOrIntersectionType(dstNumberIndexType) &&
                 isObjectOrUnionOrIntersectionType(srcPropType)
             ) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstNumberIndexType,
                     srcPropType,
-                    [...prefix, "[number]/"+srcProp.name],
-                    offendingProperties,
-                    expanded,
+                    ["[number]/"+srcProp.name],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     srcPropType,
                     dstNumberIndexType,
@@ -444,6 +503,7 @@ function checkAssignmentImpl (
                 const dstSubTypeOfSrc = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     dstNumberIndexType,
                     srcPropType,
@@ -456,6 +516,7 @@ function checkAssignmentImpl (
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
                     addOffendingProperty(offendingProperties, [...prefix].join(".")+"[number]/"+srcProp.name);
+                    addOffendingProperty(expandedValue, "[string]/"+srcProp.name);
                 }
             }
         }
@@ -475,24 +536,37 @@ function checkAssignmentImpl (
                 isObjectOrUnionOrIntersectionType(dstStringIndexType) &&
                 isObjectOrUnionOrIntersectionType(srcNumberIndexType)
             ) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstStringIndexType,
                     srcNumberIndexType,
-                    [...prefix, "[string]/[number]"],
-                    offendingProperties,
-                    expanded,
+                    ["[string]/[number]"],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     srcNumberIndexType,
                     dstStringIndexType,
@@ -505,6 +579,7 @@ function checkAssignmentImpl (
                 const dstSubTypeOfSrc = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     dstStringIndexType,
                     srcNumberIndexType,
@@ -517,6 +592,7 @@ function checkAssignmentImpl (
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
                     addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]/[number]");
+                    addOffendingProperty(expandedValue, "[string]/[number]");
                 }
             }
         }
@@ -528,24 +604,37 @@ function checkAssignmentImpl (
                 isObjectOrUnionOrIntersectionType(dstStringIndexType) &&
                 isObjectOrUnionOrIntersectionType(srcStringIndexType)
             ) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstStringIndexType,
                     srcStringIndexType,
-                    [...prefix, "[string]"],
-                    offendingProperties,
-                    expanded,
+                    ["[string]"],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     srcStringIndexType,
                     dstStringIndexType,
@@ -558,6 +647,7 @@ function checkAssignmentImpl (
                 const dstSubTypeOfSrc = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     dstStringIndexType,
                     srcStringIndexType,
@@ -570,6 +660,7 @@ function checkAssignmentImpl (
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
                     addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]");
+                    addOffendingProperty(expandedValue, "[string]");
                 }
             }
         }
@@ -580,24 +671,37 @@ function checkAssignmentImpl (
                 isObjectOrUnionOrIntersectionType(dstStringIndexType) &&
                 isObjectOrUnionOrIntersectionType(srcPropType)
             ) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
+                    expanded,
+                    assignabilityCache,
                     typeChecker,
                     node,
                     dstStringIndexType,
                     srcPropType,
-                    [...prefix, "[string]/"+srcProp.name],
-                    offendingProperties,
-                    expanded,
+                    ["[string]/"+srcProp.name],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     srcPropType,
                     dstStringIndexType,
@@ -610,6 +714,7 @@ function checkAssignmentImpl (
                 const dstSubTypeOfSrc = isSubTypeOf(
                     context,
                     options,
+                    assignabilityCache,
                     node,
                     dstStringIndexType,
                     srcPropType,
@@ -622,6 +727,7 @@ function checkAssignmentImpl (
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
                     addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]/"+srcProp.name);
+                    addOffendingProperty(expandedValue, "[string]/"+srcProp.name);
                 }
             }
         }
@@ -662,9 +768,12 @@ function checkAssignmentImpl (
             isObjectOrUnionOrIntersectionType(dstPropType) &&
             isObjectOrUnionOrIntersectionType(srcPropType)
         ) {
+            const subExpandedValue : string[] = [];
             checkAssignmentImpl(
                 context,
                 options,
+                expanded,
+                assignabilityCache,
                 typeChecker,
                 node,
                 dstPropType,
@@ -684,12 +793,21 @@ function checkAssignmentImpl (
                      */
                     (srcProp.valueDeclaration as any).initializer
                 ),
-                [...prefix, dstProp.name],
-                offendingProperties,
-                expanded,
+                [dstProp.name],
+                subExpandedValue,
                 dstPath,
                 srcPath,
                 sharedState
+            );
+            addOffendingProperties(
+                offendingProperties,
+                prefix,
+                subExpandedValue
+            );
+            addOffendingProperties(
+                expandedValue,
+                [],
+                subExpandedValue
             );
             if (srcPropType.getCallSignatures().length == 0) {
                 continue;
@@ -717,6 +835,7 @@ function checkAssignmentImpl (
         const srcSubTypeOfDst = isSubTypeOf(
             context,
             options,
+            assignabilityCache,
             node,
             srcPropType,
             dstPropType,
@@ -729,6 +848,7 @@ function checkAssignmentImpl (
         const dstSubTypeOfSrc = isSubTypeOf(
             context,
             options,
+            assignabilityCache,
             node,
             dstPropType,
             srcPropType,
@@ -741,6 +861,7 @@ function checkAssignmentImpl (
 
         if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
             addOffendingProperty(offendingProperties, [...prefix, dstProp.name].join("."));
+            addOffendingProperty(expandedValue, [dstProp.name].join("."));
         }
     }
 }

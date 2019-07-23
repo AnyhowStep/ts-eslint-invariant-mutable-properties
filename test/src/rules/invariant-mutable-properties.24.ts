@@ -19,16 +19,24 @@ ruleTester.run("invariant-mutable-properties", rule, {
     invalid : [
         {
             code : (`
-declare const src : {a:number}|{a:number,b:string};
-const dst : {a:number|string} = src;
-const dst2 : {readonly a:number|string} = src;
+declare const src : { [index:number] : number };
+let dst : { [index:number] : number|string } = src;
+declare function foo (arg? : typeof dst) : void;
+foo(src);
+foo();
             `),
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
-                    data : { properties: "a" },
+                    data : { properties: "[number]" },
                     line : 3,
-                    column : 11,
+                    column : 9,
+                },
+                {
+                    messageId : mutablePropertiesAreInvariant,
+                    data : { properties: "[number]" },
+                    line : 5,
+                    column : 5,
                 },
             ],
         },

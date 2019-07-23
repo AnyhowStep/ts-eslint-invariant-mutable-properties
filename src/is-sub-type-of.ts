@@ -14,6 +14,9 @@ import {Options} from "./options";
 export function isSubTypeOf (
     context : RuleContext<typeof tsSimpleTypeCrash, Options>,
     options : Options,
+    assignabilityCache : {
+        [k:string] : boolean|undefined|Error
+    },
     //Commented out to get around lint error
     //node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
     //*
@@ -27,28 +30,42 @@ export function isSubTypeOf (
     b : ts.Type,
     checker : ts.TypeChecker
 ) : boolean|undefined {
-    try {
-        return isAssignableToType(
-            /**
-             * This is intentional. `ts-simple-type` switches `a` and `b`
-             */
-            b,
-            a,
-            checker,
-            {
-                strict : true,
-                strictNullChecks : true,
-                strictFunctionTypes : true,
-                noStrictGenericChecks : false,
-            }
-        );
-    } catch (err) {
+    const key = (a as any).id + "-" + (b as any).id;
+    let cached = assignabilityCache[key];
+    if (cached == undefined) {
+        try {
+            cached = isAssignableToType(
+                /**
+                 * This is intentional. `ts-simple-type` switches `a` and `b`
+                 */
+                b,
+                a,
+                checker,
+                {
+                    strict : true,
+                    strictNullChecks : true,
+                    strictFunctionTypes : true,
+                    noStrictGenericChecks : false,
+                }
+            );
+        } catch (err) {
+            cached = err;
+        }
+        assignabilityCache[key] = cached;
+    }
+    if (cached == undefined) {
+        return undefined;
+    }
+
+    if (typeof cached == "boolean") {
+        return cached;
+    } else {
         if (options[0].reportTsSimpleTypeCrash === true) {
             context.report({
                 node : {...node},
                 messageId : tsSimpleTypeCrash,
                 data : {
-                    message : err.message,
+                    message : cached.message,
                 },
             });
         }
