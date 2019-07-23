@@ -118,6 +118,8 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
   Tests 30 and 31 show the rule thinking it is unsafe when it is safe.
 
++ More `extends/implements` tests
+
 + More tests
 
 + Use more stable type-checking API
