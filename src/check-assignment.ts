@@ -13,7 +13,8 @@ import {
     isAsExpression,
     isTypeReferenceNode,
     isIdentifier,
-    isObjectOrArrayLiteral
+    isObjectOrArrayLiteral,
+    isMappedType
 } from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options} from "./options";
@@ -50,24 +51,84 @@ export function checkAssignment (
         });
     }
 }
+function addOffendingProperty (
+    offendingProperties : string[],
+    property : string
+) {
+    if (!offendingProperties.includes(property)) {
+        offendingProperties.push(property);
+    }
+}
 function checkAssignmentImpl (
     context : RuleContext<MessageId, Options>,
     typeChecker : ts.TypeChecker,
     node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
     dst : TSNode|ts.ObjectType|ts.UnionType,
-    src : TSNode|ts.ObjectType,
+    src : TSNode|ts.ObjectType|ts.UnionType,
     prefix : string[] = [],
     offendingProperties : string[] = [],
     expanded : Set<string> = new Set<string>()
 ) {
-    let srcType = isObjectType(src) ?
+    let srcType = (
+        isObjectType(src) ?
         src :
-        typeChecker.getTypeAtLocation(src);
+        isUnionType(src) ?
+        src :
+        typeChecker.getTypeAtLocation(src)
+    );
     const srcTypeConstraint = srcType.getConstraint();
     if (srcTypeConstraint != undefined) {
         srcType = srcTypeConstraint;
     }
     srcType = srcType.getNonNullableType();
+
+    let dstType = (
+        isObjectType(dst) ?
+        dst :
+        isUnionType(dst) ?
+        dst :
+        typeChecker.getTypeAtLocation(dst)
+    );
+    const dstTypeConstraint = dstType.getConstraint();
+    if (dstTypeConstraint != undefined) {
+        dstType = dstTypeConstraint;
+    }
+    dstType = dstType.getNonNullableType();
+
+    //Special case for union src type
+    if (isUnionType(srcType)) {
+        for (const srcTypeEle of srcType.types) {
+            if (!isObjectType(srcTypeEle)) {
+                //Only check object types
+                continue;
+            }
+            const isSubType = isSubTypeOf(
+                context,
+                node,
+                srcTypeEle,
+                dstType,
+                typeChecker
+            );
+            if (isSubType == undefined) {
+                //ts-simple-type crashed
+                return;
+            }
+            if (isSubType) {
+                checkAssignmentImpl(
+                    context,
+                    typeChecker,
+                    node,
+                    dst,
+                    srcTypeEle,
+                    prefix,
+                    offendingProperties,
+                    expanded
+                );
+            }
+        }
+        return;
+    }
+
     if (!isObjectType(srcType)) {
         //Only check object types
         return;
@@ -91,19 +152,6 @@ function checkAssignmentImpl (
             return;
         }
     }
-
-    let dstType = (
-        isObjectType(dst) ?
-        dst :
-        isUnionType(dst) ?
-        dst :
-        typeChecker.getTypeAtLocation(dst)
-    );
-    const dstTypeConstraint = dstType.getConstraint();
-    if (dstTypeConstraint != undefined) {
-        dstType = dstTypeConstraint;
-    }
-    dstType = dstType.getNonNullableType();
 
     //Special case for union dst type
     if (isUnionType(dstType)) {
@@ -133,10 +181,10 @@ function checkAssignmentImpl (
                     prefix,
                     offendingProperties,
                     expanded
-                )
-                return;
+                );
             }
         }
+        return;
     }
 
     if (!isObjectType(dstType)) {
@@ -197,7 +245,7 @@ function checkAssignmentImpl (
                 }
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-                    offendingProperties.push([...prefix].join(".")+"[number]");
+                    addOffendingProperty(offendingProperties, [...prefix].join(".")+"[number]");
                 }
             }
         }
@@ -247,7 +295,7 @@ function checkAssignmentImpl (
                 }
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-                    offendingProperties.push([...prefix].join(".")+"[number]/"+srcProp.name);
+                    addOffendingProperty(offendingProperties, [...prefix].join(".")+"[number]/"+srcProp.name);
                 }
             }
         }
@@ -302,7 +350,7 @@ function checkAssignmentImpl (
                 }
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-                    offendingProperties.push([...prefix].join(".")+"[string]/[number]");
+                    addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]/[number]");
                 }
             }
         }
@@ -349,7 +397,7 @@ function checkAssignmentImpl (
                 }
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-                    offendingProperties.push([...prefix].join(".")+"[string]");
+                    addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]");
                 }
             }
         }
@@ -395,7 +443,7 @@ function checkAssignmentImpl (
                 }
 
                 if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-                    offendingProperties.push([...prefix].join(".")+"[string]/"+srcProp.name);
+                    addOffendingProperty(offendingProperties, [...prefix].join(".")+"[string]/"+srcProp.name);
                 }
             }
         }
@@ -477,6 +525,13 @@ function checkAssignmentImpl (
             continue;
         }
 
+        /**
+         * @todo This needs to be tested more
+         */
+        if (isMappedType(dstType) && dstType.declaration.readonlyToken != undefined) {
+            continue;
+        }
+
         const srcSubTypeOfDst = isSubTypeOf(
             context,
             node,
@@ -501,7 +556,7 @@ function checkAssignmentImpl (
         }
 
         if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-            offendingProperties.push([...prefix, dstProp.name].join("."));
+            addOffendingProperty(offendingProperties, [...prefix, dstProp.name].join("."));
         }
     }
 }

@@ -118,7 +118,11 @@ const rule = createRule<Options, MessageId>({
                         context,
                         arg,
                         typeChecker.getTypeAtLocation(service.esTreeNodeToTSNodeMap.get(arg)),
-                        typeChecker.getTypeAtLocation(param.valueDeclaration),
+                        //This commented out line, if used, causes the invariant-mutable-properties error!
+                        //typeChecker.getTypeAtLocation(param.valueDeclaration),
+                        typeChecker.getTypeAtLocation({
+                            ...param.valueDeclaration,
+                        }),
                         typeChecker
                     );
                     if (isSubType == undefined) {

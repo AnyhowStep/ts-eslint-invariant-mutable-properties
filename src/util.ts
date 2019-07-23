@@ -25,13 +25,23 @@ export function isUnionType (typeOrNode : ts.Type|TSNode) : typeOrNode is ts.Uni
         ((typeOrNode.flags & ts.TypeFlags.Union) !== 0)
     );
 }
-export function isObjectOrArrayLiteral (typeOrNode : ts.ObjectType|TSNode) : boolean {
+export function isObjectOrArrayLiteral (typeOrNode : ts.ObjectType|TSNode|ts.UnionType) : boolean {
     if (isObjectType(typeOrNode)) {
         return (typeOrNode.objectFlags & ts.ObjectFlags.ObjectLiteral) != 0;
+    } if (isUnionType(typeOrNode)) {
+        return false;
     } else {
         return (
             (typeOrNode.kind == ts.SyntaxKind.ObjectLiteralExpression) ||
             (typeOrNode.kind == ts.SyntaxKind.ArrayLiteralExpression)
         );
     }
+}
+
+export function isMappedType (type : any) : type is { declaration : ts.MappedTypeNode } {
+    return (
+        ((type.objectFlags & ts.ObjectFlags.Mapped) != 0) &&
+        type.declaration != undefined &&
+        type.declaration.kind == ts.SyntaxKind.MappedType
+    );
 }

@@ -13,7 +13,15 @@ import {Options} from "./options";
  */
 export function isSubTypeOf (
     context : RuleContext<typeof tsSimpleTypeCrash, Options>,
-    node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
+    //Commented out to get around lint error
+    //node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
+    //*
+    node : (
+        TSESTree.Node | TSESTree.Comment | TSESTree.Token extends infer I ?
+        Readonly<I> :
+        never
+    ),
+    //*/
     a : ts.Type,
     b : ts.Type,
     checker : ts.TypeChecker

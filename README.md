@@ -87,9 +87,25 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 ### TODO
 
 + Proper support for return types (and tests!)
+
+  I have not explicitly started work on it but it should get some cases correct out of the box.
+
+  Some tests even check for it.
+
 + Proper support for generics (and tests!)
+
+  There are known cases where this fails.
+
 + Proper support for unions (and tests!)
+
+  Right now, it gets many cases correct.
+
+  There may be cases where it is wrong and I haven't thought of it yet.
+
 + Proper support for intersections (and tests!)
+
+  Haven't started.
+
 + Proper checking for object/array literals (and tests!)
 
   Right now, it gets many cases correct.
