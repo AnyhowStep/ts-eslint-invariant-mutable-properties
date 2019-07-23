@@ -178,6 +178,11 @@ function checkAssignmentImpl (
     }
     dstType = dstType.getNonNullableType();
 
+    if ((srcType as any).id == (dstType as any).id) {
+        //Should always be safe to assign the same type to itself
+        return;
+    }
+
     /**
      * @todo use `Set<>()` instead?
      */
