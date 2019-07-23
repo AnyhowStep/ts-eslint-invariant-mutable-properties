@@ -774,21 +774,13 @@ function checkAssignmentImpl (
                 dstPropValueDeclaration = (dstProp as any).syntheticOrigin.valueDeclaration;
             }
         }
-        if (dstPropValueDeclaration == undefined) {
-            if (options[0].reportRuleCrash === true) {
-                context.report({
-                    node : {...node},
-                    messageId : ruleCrash,
-                    data : {
-                        message : "Cannot get valueDeclaration of dst",
-                    },
-                });
-            }
-            continue;
-        }
 
         const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
-        const dstPropType = typeChecker.getTypeAtLocation(dstPropValueDeclaration);
+        const dstPropType : ts.Type = (
+            dstPropValueDeclaration == undefined ?
+            typeChecker.getDeclaredTypeOfSymbol(dstProp) :
+            typeChecker.getTypeAtLocation(dstPropValueDeclaration)
+        );
         if (
             isObjectOrUnionOrIntersectionType(dstPropType) &&
             isObjectOrUnionOrIntersectionType(srcPropType)
@@ -840,6 +832,7 @@ function checkAssignmentImpl (
         }
 
         if (
+            dstPropValueDeclaration != undefined &&
             dstPropValueDeclaration.modifiers != undefined &&
             dstPropValueDeclaration.modifiers.some(m => m.kind == ts.SyntaxKind.ReadonlyKeyword)
         ) {
