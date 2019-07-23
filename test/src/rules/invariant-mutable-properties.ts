@@ -154,56 +154,6 @@ foo({
 foo();
             `),
         },
-        /**
-         * Right now, this is considered valid but is not.
-         * @todo Make this invalid
-         */
-        {
-            code : (`
-declare const src : {
-    nested : {
-        doNotMutateMePlease : string,
-    }
-};
-//Right now, the rule thinks object literals are **ALWAYS** safe
-//but this is not true
-const dst : {
-    nested : {
-        doNotMutateMePlease : string|number,
-    }
-} = {
-    ...src,
-};
-//Boom.
-//src.nested.doNotMutateMePlease is now number and not string
-dst.nested.doNotMutateMePlease = 34;
-            `),
-        },
-        /**
-         * Right now, this is considered valid but is not.
-         * @todo Make this invalid
-         */
-        {
-            code : (`
-declare const src : {
-    nested : {
-        doNotMutateMePlease : string,
-    }
-}[];
-//Right now, the rule thinks object literals are **ALWAYS** safe
-//but this is not true
-const dst : {
-    nested : {
-        doNotMutateMePlease : string|number,
-    }
-}[] = [
-    ...src,
-];
-//Boom.
-//src[0].nested.doNotMutateMePlease is now number and not string
-dst[0].nested.doNotMutateMePlease = 34;
-            `),
-        },
         {
             code : (`
 declare const src : { "1" : number, "2" : number|string, 3 : number, 4 : number|string };

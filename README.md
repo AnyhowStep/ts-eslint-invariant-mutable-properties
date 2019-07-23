@@ -86,12 +86,15 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
 ### TODO
 
++ Proper support for return types (and tests!)
 + Proper support for generics (and tests!)
++ Proper support for unions (and tests!)
++ Proper support for intersections (and tests!)
 + Proper checking for object/array literals (and tests!)
 
-  Right now, it always assumes object/array literals are safe but this is not true.
+  Right now, it gets many cases correct.
 
-  Ctrl+F `@todo` for examples
+  There may be cases where it is wrong and I haven't thought of it yet.
 
 + More tests
 
@@ -117,37 +120,6 @@ foo<{ x : 2 }>(src);
 console.log(src.x); //1
 ```
 [Playground](http://www.typescriptlang.org/play/#code/GYVwdgxgLglg9mABMOcA8BlAThAKogUwA8oCwATAZ0QG9EjEAuRMEAWwCMCtEBfAPkQAKSjiaJseAJS0AUIgWIA9EoBKMAOYALKCzgB3ADSIoWgoiwgANudMwwAa2p3qMapQCGwAvMUqOILouiG56QZY+iogQCJS6VLrMdAzMrJzcfIgAvIiiEADcvgoqAJJsHhr25pL4ocniAEx8RcpKAEKobMZ5AHQMYAaIWh7UAIwhYHEEHuSIcMCIDS0JfdmIo4W8sjGTunni9cxNvGuHi3yFO5RwNj1WcBoiOH1S+a1LKOhnx-xPEK-bWI3Ah3B5-F5vFSjWRAA)
-
------
-
-The rule does not handle object and array literals properly yet,
-```ts
-const src : {
-    nested : {
-        doNotMutateMePlease : string,
-    }
-} = {
-    nested : {
-        doNotMutateMePlease : "please?"
-    }
-};
-//Right now, the rule thinks object literals are **ALWAYS** safe
-//but this is not true
-const dst : {
-    nested : {
-        doNotMutateMePlease : string|number,
-    }
-} = {
-    ...src,
-};
-//Boom.
-//src.nested.doNotMutateMePlease is now number and not string
-console.log(src.nested.doNotMutateMePlease); //"please?"
-dst.nested.doNotMutateMePlease = 34;
-console.log(src.nested.doNotMutateMePlease); //34
-```
-[Playground](http://www.typescriptlang.org/play/#code/MYewdgzgLgBBBOwYC4YG8BQNszAU2jwBMV0scKiQA5EKAWQFcoBDKPevABQBs8WIeUtHgBLMAHMANOWwBfDHJgBeMhXyESqTBUo06TVu069+g0gCIADnwF4A-BdkwFcgNwYA9J4BKoiQAWsGAgAO5SMFABQvCMfJEB4gDWEDAgAEYAVnjAsDyi7PAsPKks8EIAVBUAggAyAOrVAJoAylVwLABmeF6e6cwJoqlDuHSRsT2gkLBE0KQ6OBrsWmq62FS0DMxsHNy25qgi4hIAPmCMALbpePAyFK4qq9gAdK8IwDLuvQBCICAXz1672eS2Izw2Bm2xj2ZiEIxCoVwl2u8BgLDAJBCsCOkgwUwgID4zx4IAkAApgaCiOD9FsjLtTHYAJRuGDeaz7BxOWZQEEEZY0zaGHYmTmPADMABYPPjCXhiaSKYg+ZpBZD6aLYSy2Z4pUA)
-
 
 -----
 

@@ -12,7 +12,8 @@ import {
     isUnionType,
     isAsExpression,
     isTypeReferenceNode,
-    isIdentifier
+    isIdentifier,
+    isObjectOrArrayLiteral
 } from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options} from "./options";
@@ -53,7 +54,7 @@ function checkAssignmentImpl (
     context : RuleContext<MessageId, Options>,
     typeChecker : ts.TypeChecker,
     node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
-    dst : TSNode|ts.ObjectType,
+    dst : TSNode|ts.ObjectType|ts.UnionType,
     src : TSNode|ts.ObjectType,
     prefix : string[] = [],
     offendingProperties : string[] = [],
@@ -71,59 +72,10 @@ function checkAssignmentImpl (
         //Only check object types
         return;
     }
-    if (!isObjectType(src) && src.kind == ts.SyntaxKind.ObjectLiteralExpression) {
-        //No need to check object literals... For now
-        /**
-         * @todo THIS IS NOT ACTUALLY SOUND!
-         *
-         * ```ts
-         *  declare const src : {
-         *      nested : {
-         *          doNotMutateMePlease : string,
-         *      }
-         *  };
-         *  //Right now, the rule thinks object literals are **ALWAYS** safe
-         *  //but this is not true
-         *  const dst : {
-         *      nested : {
-         *          doNotMutateMePlease : string|number,
-         *      }
-         *  } = {
-         *      ...src,
-         *  };
-         *  //Boom.
-         *  //`src.nested.doNotMutateMePlease` is now `number` and not `string`
-         *  dst.nested.doNotMutateMePlease = 34;
-         * ```
-         */
-        return;
-    }
-    if (!isObjectType(src) && src.kind == ts.SyntaxKind.ArrayLiteralExpression) {
-        //No need to check array literals... For now
-        /**
-         * @todo THIS IS NOT ACTUALLY SOUND!
-         *
-         * ```ts
-         *  declare const src : {
-         *      nested : {
-         *          doNotMutateMePlease : string,
-         *      }
-         *  }[];
-         *  //Right now, the rule thinks object literals are **ALWAYS** safe
-         *  //but this is not true
-         *  const dst : {
-         *      nested : {
-         *          doNotMutateMePlease : string|number,
-         *      }
-         *  }[] = [
-         *      ...src,
-         *  ];
-         *  //Boom.
-         *  //`src[0].nested.doNotMutateMePlease` is now `number` and not `string`
-         *  dst[0].nested.doNotMutateMePlease = 34;
-         * ```
-         */
-        return;
+    let shallowSafe = false;
+
+    if (isObjectOrArrayLiteral(src)) {
+        shallowSafe = true;
     }
     if (srcType.symbol.valueDeclaration != undefined) {
         const srcParent = srcType.symbol.valueDeclaration.parent;
@@ -140,9 +92,13 @@ function checkAssignmentImpl (
         }
     }
 
-    let dstType = isObjectType(dst) ?
+    let dstType = (
+        isObjectType(dst) ?
         dst :
-        typeChecker.getTypeAtLocation(dst);
+        isUnionType(dst) ?
+        dst :
+        typeChecker.getTypeAtLocation(dst)
+    );
     const dstTypeConstraint = dstType.getConstraint();
     if (dstTypeConstraint != undefined) {
         dstType = dstTypeConstraint;
@@ -201,9 +157,11 @@ function checkAssignmentImpl (
         !dstNumberIndexInfo.isReadonly
     ) {
         const srcNumberIndexType = srcType.getNumberIndexType();
-
         if (srcNumberIndexType != undefined) {
-            if (isObjectType(dstNumberIndexType) && isObjectType(srcNumberIndexType)) {
+            if (
+                (isUnionType(dstNumberIndexType) || isObjectType(dstNumberIndexType)) &&
+                isObjectType(srcNumberIndexType)
+            ) {
                 checkAssignmentImpl(
                     context,
                     typeChecker,
@@ -214,7 +172,7 @@ function checkAssignmentImpl (
                     offendingProperties,
                     expanded
                 );
-            } else {
+            } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     node,
@@ -250,7 +208,10 @@ function checkAssignmentImpl (
                 continue;
             }
             const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
-            if (isObjectType(dstNumberIndexType) && isObjectType(srcPropType)) {
+            if (
+                (isUnionType(dstNumberIndexType) || isObjectType(dstNumberIndexType)) &&
+                isObjectType(srcPropType)
+            ) {
                 checkAssignmentImpl(
                     context,
                     typeChecker,
@@ -261,7 +222,7 @@ function checkAssignmentImpl (
                     offendingProperties,
                     expanded
                 );
-            } else {
+            } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     node,
@@ -302,7 +263,10 @@ function checkAssignmentImpl (
         const srcNumberIndexType = srcType.getNumberIndexType();
 
         if (srcNumberIndexType != undefined) {
-            if (isObjectType(dstStringIndexType) && isObjectType(srcNumberIndexType)) {
+            if (
+                (isUnionType(dstStringIndexType) || isObjectType(dstStringIndexType)) &&
+                isObjectType(srcNumberIndexType)
+            ) {
                 checkAssignmentImpl(
                     context,
                     typeChecker,
@@ -313,7 +277,7 @@ function checkAssignmentImpl (
                     offendingProperties,
                     expanded
                 );
-            } else {
+            } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     node,
@@ -346,7 +310,10 @@ function checkAssignmentImpl (
         const srcStringIndexType = srcType.getStringIndexType();
 
         if (srcStringIndexType != undefined) {
-            if (isObjectType(dstStringIndexType) && isObjectType(srcStringIndexType)) {
+            if (
+                (isUnionType(dstStringIndexType) || isObjectType(dstStringIndexType)) &&
+                isObjectType(srcStringIndexType)
+            ) {
                 checkAssignmentImpl(
                     context,
                     typeChecker,
@@ -357,7 +324,7 @@ function checkAssignmentImpl (
                     offendingProperties,
                     expanded
                 );
-            } else {
+            } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     node,
@@ -389,7 +356,10 @@ function checkAssignmentImpl (
 
         for (const srcProp of srcType.getProperties()) {
             const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
-            if (isObjectType(dstStringIndexType) && isObjectType(srcPropType)) {
+            if (
+                (isUnionType(dstStringIndexType) || isObjectType(dstStringIndexType)) &&
+                isObjectType(srcPropType)
+            ) {
                 checkAssignmentImpl(
                     context,
                     typeChecker,
@@ -400,7 +370,7 @@ function checkAssignmentImpl (
                     offendingProperties,
                     expanded
                 );
-            } else {
+            } else if (!shallowSafe) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     node,
@@ -462,13 +432,31 @@ function checkAssignmentImpl (
 
         const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
         const dstPropType = typeChecker.getTypeAtLocation(dstPropValueDeclaration);
-        if (isObjectType(dstPropType) && isObjectType(srcPropType)) {
+        if (
+            (isUnionType(dstPropType) || isObjectType(dstPropType)) &&
+            isObjectType(srcPropType)
+        ) {
             checkAssignmentImpl(
                 context,
                 typeChecker,
                 node,
                 dstPropType,
-                srcPropType,
+                (
+                    ((srcProp.valueDeclaration as any).initializer == undefined) ?
+                    srcPropType :
+                    /**
+                     * This is undocumented but exists.
+                     *
+                     * If `srcProp.valueDeclaration` if of `kind`
+                     * `SyntaxKind.PropertyAssignment`,
+                     *
+                     * then it has the undocumented property `initializer`.
+                     * This `initializer` can possibly be of `kind`
+                     * `SyntaxKind.ArrayLiteralExpression` or
+                     * `SyntaxKind.ObjectLiteralExpression`
+                     */
+                    (srcProp.valueDeclaration as any).initializer
+                ),
                 [...prefix, dstProp.name],
                 offendingProperties,
                 expanded
@@ -484,6 +472,11 @@ function checkAssignmentImpl (
         ) {
             continue;
         }
+
+        if (shallowSafe) {
+            continue;
+        }
+
         const srcSubTypeOfDst = isSubTypeOf(
             context,
             node,
