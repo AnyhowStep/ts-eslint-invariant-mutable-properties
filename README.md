@@ -104,7 +104,9 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
 + Proper support for intersections (and tests!)
 
-  Haven't started.
+  Right now, it gets some cases correct.
+
+  There may be cases where it is wrong and I haven't thought of it yet.
 
 + Proper checking for object/array literals (and tests!)
 

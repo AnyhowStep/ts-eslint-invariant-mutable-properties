@@ -13,6 +13,7 @@ import {Options} from "./options";
  */
 export function isSubTypeOf (
     context : RuleContext<typeof tsSimpleTypeCrash, Options>,
+    options : Options,
     //Commented out to get around lint error
     //node : TSESTree.Node | TSESTree.Comment | TSESTree.Token,
     //*
@@ -42,9 +43,9 @@ export function isSubTypeOf (
             }
         );
     } catch (err) {
-        if (context.options[0].reportTsSimpleTypeCrash === true) {
+        if (options[0].reportTsSimpleTypeCrash === true) {
             context.report({
-                node,
+                node : {...node},
                 messageId : tsSimpleTypeCrash,
                 data : {
                     message : err.message,

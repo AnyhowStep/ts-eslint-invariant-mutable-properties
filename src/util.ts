@@ -1,6 +1,13 @@
 import * as ts from "typescript";
 import {TSNode} from "@typescript-eslint/typescript-estree";
-
+export type UnionType = (
+    ts.UnionType &
+    { __unionBrand? : unknown }
+);
+export type IntersectionType = (
+    ts.IntersectionType &
+    { __intersectionBrand? : unknown }
+);
 export function isObjectType (typeOrNode : ts.Type|TSNode) : typeOrNode is ts.ObjectType {
     return (
         ((typeOrNode as ts.Type).symbol != undefined) &&
@@ -19,16 +26,27 @@ export function isIdentifier (entityName : ts.EntityName) : entityName is ts.Ide
 export function isParameterDeclaration (declaration : ts.Declaration) : declaration is ts.ParameterDeclaration {
     return declaration.kind == ts.SyntaxKind.Parameter;
 }
-export function isUnionType (typeOrNode : ts.Type|TSNode) : typeOrNode is ts.UnionType {
+export function isUnionType (typeOrNode : ts.Type|TSNode) : typeOrNode is UnionType {
     return (
         ((typeOrNode as ts.UnionType).types != undefined) &&
         ((typeOrNode.flags & ts.TypeFlags.Union) !== 0)
     );
 }
-export function isObjectOrArrayLiteral (typeOrNode : ts.ObjectType|TSNode|ts.UnionType) : boolean {
+export function isIntersectionType (typeOrNode : ts.Type|TSNode) : typeOrNode is IntersectionType {
+    return (
+        ((typeOrNode as ts.IntersectionType).types != undefined) &&
+        ((typeOrNode.flags & ts.TypeFlags.Intersection) !== 0)
+    );
+}
+export function isObjectOrUnionOrIntersectionType (type : ts.Type) : type is (ts.ObjectType|UnionType|IntersectionType) {
+    return isObjectType(type) || isUnionType(type) || isIntersectionType(type)
+}
+export function isObjectOrArrayLiteral (typeOrNode : ts.ObjectType|TSNode|UnionType|IntersectionType) : boolean {
     if (isObjectType(typeOrNode)) {
         return (typeOrNode.objectFlags & ts.ObjectFlags.ObjectLiteral) != 0;
     } if (isUnionType(typeOrNode)) {
+        return false;
+    } if (isIntersectionType(typeOrNode)) {
         return false;
     } else {
         return (

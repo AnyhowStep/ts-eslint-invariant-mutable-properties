@@ -21,19 +21,33 @@ const rule = createRule<Options, MessageId>({
             mutablePropertiesAreInvariant : "Mutable properties are invariant; {{properties}}",
             tsSimpleTypeCrash : "ts-simple-type crashed; {{message}}",
             ruleCrash : "rule crashed; {{message}}",
+            maxDepthReached : "max depth reached; {{maxDepth}}",
+            maxPairwiseComparisonReached : "max pairwise comparison reached; {{maxPairwiseComparison}}",
         },
         schema : [
             {
-                type: "object",
-                properties: {
-                    reportTsSimpleTypeCrash: {
-                        type: "boolean",
+                type : "object",
+                properties : {
+                    reportTsSimpleTypeCrash : {
+                        type : "boolean",
                     },
-                    reportRuleCrash: {
-                        type: "boolean",
+                    reportRuleCrash : {
+                        type : "boolean",
+                    },
+                    reportMaxDepth : {
+                        type : "boolean",
+                    },
+                    reportMaxPairwiseComparison : {
+                        type : "boolean",
+                    },
+                    maxDepth : {
+                        type : "number",
+                    },
+                    maxPairwiseComparison : {
+                        type : "number",
                     },
                 },
-                additionalProperties: false,
+                additionalProperties : false,
             },
         ],
     },
@@ -41,9 +55,16 @@ const rule = createRule<Options, MessageId>({
         {
             reportTsSimpleTypeCrash : true,
             reportRuleCrash : true,
+
+            reportMaxDepth : true,
+            reportMaxPairwiseComparison : true,
+
+            maxDepth : 50,
+            maxPairwiseComparison : 100,
         }
     ],
-    create (context) {
+    create (context, options) {
+        //For some reason, `context.options` starts out as an empty array?
         const service = getParserServices(context);
         const typeChecker = service.program.getTypeChecker();
 
@@ -55,6 +76,7 @@ const rule = createRule<Options, MessageId>({
             const rightNode = service.esTreeNodeToTSNodeMap.get(node.right);
             checkAssignment(
                 context,
+                options,
                 typeChecker,
                 node.left,
                 leftNode,
@@ -67,6 +89,7 @@ const rule = createRule<Options, MessageId>({
 
             checkAssignment(
                 context,
+                options,
                 typeChecker,
                 node.left,
                 leftNode,
@@ -85,6 +108,7 @@ const rule = createRule<Options, MessageId>({
                 const idNode = service.esTreeNodeToTSNodeMap.get(decl.id);
                 checkAssignment(
                     context,
+                    options,
                     typeChecker,
                     decl.id.typeAnnotation,
                     idNode,
@@ -116,6 +140,7 @@ const rule = createRule<Options, MessageId>({
                     }
                     const isSubType = isSubTypeOf(
                         context,
+                        options,
                         arg,
                         typeChecker.getTypeAtLocation(service.esTreeNodeToTSNodeMap.get(arg)),
                         //This commented out line, if used, causes the invariant-mutable-properties error!
@@ -148,6 +173,7 @@ const rule = createRule<Options, MessageId>({
                         }
                         checkAssignment(
                             context,
+                            options,
                             typeChecker,
                             arg,
                             param.valueDeclaration,
