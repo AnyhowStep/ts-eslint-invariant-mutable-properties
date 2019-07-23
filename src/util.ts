@@ -63,3 +63,31 @@ export function isMappedType (type : any) : type is { declaration : ts.MappedTyp
         type.declaration.kind == ts.SyntaxKind.MappedType
     );
 }
+
+export function hasHeritageClauses (declaration : ts.Declaration) : declaration is ts.Declaration & { heritageClauses : ts.NodeArray<ts.HeritageClause> } {
+    return (
+        (declaration as any).heritageClauses != undefined
+    )
+}
+
+export function isHeritageOfId (typeChecker : ts.TypeChecker, heritageType: ts.ExpressionWithTypeArguments, id : number) : boolean {
+    const type = typeChecker.getTypeAtLocation(heritageType);
+    if (type == undefined) {
+        return false;
+    }
+
+    if (
+        (type as any).target != undefined &&
+        (type as any).target.id == id
+    ) {
+        return true;
+    }
+    if (
+        (type as any).symbol != undefined &&
+        (type as any).symbol.declaredType != undefined &&
+        (type as any).symbol.declaredType.id == id
+    ) {
+        return true;
+    }
+    return false;
+}

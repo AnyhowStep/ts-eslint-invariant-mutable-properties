@@ -5,7 +5,7 @@ import {MessageId} from "./message-ids";
 import {checkAssignment} from "./check-assignment";
 import {isParameterDeclaration} from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
-import {Options} from "./options";
+import {Options, getDefaultOptions} from "./options";
 const createRule = util.RuleCreator(ruleName => ruleName);
 
 const rule = createRule<Options, MessageId>({
@@ -46,23 +46,15 @@ const rule = createRule<Options, MessageId>({
                     maxPairwiseComparison : {
                         type : "number",
                     },
+                    unsoundExtendsAndImplementsCheck : {
+                        type : "boolean",
+                    },
                 },
                 additionalProperties : false,
             },
         ],
     },
-    defaultOptions : [
-        {
-            reportTsSimpleTypeCrash : true,
-            reportRuleCrash : true,
-
-            reportMaxDepth : true,
-            reportMaxPairwiseComparison : true,
-
-            maxDepth : 50,
-            maxPairwiseComparison : 100000,
-        }
-    ],
+    defaultOptions : getDefaultOptions(),
     create (context, options) {
         //For some reason, `context.options` starts out as an empty array?
         const service = getParserServices(context);

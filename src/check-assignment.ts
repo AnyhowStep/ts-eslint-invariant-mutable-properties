@@ -18,7 +18,9 @@ import {
     UnionType,
     IntersectionType,
     isIntersectionType,
-    isObjectOrUnionOrIntersectionType
+    isObjectOrUnionOrIntersectionType,
+    hasHeritageClauses,
+    isHeritageOfId
 } from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options} from "./options";
@@ -406,6 +408,60 @@ function checkAssignmentImpl (
     }
     expandedValue = [];
     expanded.set(expandedKey, expandedValue);
+
+    /**
+     * This is intended to check the `extends/implements` keywords
+     *
+     * I have no idea why this **FAILS** sometimes.
+     */
+    if (
+        options[0].unsoundExtendsAndImplementsCheck &&
+        srcType.symbol != undefined &&
+        srcType.symbol.valueDeclaration != undefined &&
+        hasHeritageClauses(srcType.symbol.valueDeclaration)
+    ) {
+        for (const heritageClause of srcType.symbol.valueDeclaration.heritageClauses) {
+            for (const heritageType of heritageClause.types) {
+                if (isHeritageOfId(typeChecker, heritageType, (dstType as any).id)) {
+                    //src extends/implements dst
+                    //Assignment is safe
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * This is **ALSO** intended to check the `extends/implements` keywords
+     *
+     * I have no idea why this **SUCCEEDS** sometimes.
+     */
+    if (
+        options[0].unsoundExtendsAndImplementsCheck &&
+        srcType.symbol != undefined
+    ) {
+        const t = typeChecker.getDeclaredTypeOfSymbol(srcType.symbol);
+        if (
+            t.symbol != undefined &&
+            t.symbol.valueDeclaration != undefined &&
+            (t.symbol.valueDeclaration as any).symbol != undefined &&
+            (t.symbol.valueDeclaration as any).symbol.declarations != undefined
+        ) {
+            for (const declaration of (t.symbol.valueDeclaration as any).symbol.declarations) {
+                if (hasHeritageClauses(declaration)) {
+                    for (const heritageClause of declaration.heritageClauses) {
+                        for (const heritageType of heritageClause.types) {
+                            if (isHeritageOfId(typeChecker, heritageType, (dstType as any).id)) {
+                                //src extends/implements dst
+                                //Assignment is safe
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     const dstNumberIndexInfo = typeChecker.getIndexInfoOfType(dstType, ts.IndexKind.Number);
     const dstNumberIndexType = dstType.getNumberIndexType();
