@@ -363,21 +363,6 @@ function foo<SrcT extends { x : number }> (src : SrcT) {
         },
         {
             code : (`
-declare function foo<SrcT extends { x : number }> (src : SrcT) : void;
-declare const src : { x : 1 };
-foo(src);
-            `),
-            errors : [
-                {
-                    messageId : mutablePropertiesAreInvariant,
-                    data : { properties: "x" },
-                    line : 4,
-                    column : 5,
-                },
-            ],
-        },
-        {
-            code : (`
 declare const src : { [index:number] : number };
 let dst : { [index:number] : number|string } = src;
 declare function foo (arg? : typeof dst) : void;
