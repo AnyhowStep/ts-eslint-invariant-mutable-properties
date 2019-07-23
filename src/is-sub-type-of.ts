@@ -65,7 +65,7 @@ export function isSubTypeOf (
                 node : {...node},
                 messageId : tsSimpleTypeCrash,
                 data : {
-                    message : cached.message,
+                    message : cached.message + "; stack: " + cached.stack,
                 },
             });
         }

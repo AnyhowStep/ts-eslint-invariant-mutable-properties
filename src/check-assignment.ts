@@ -62,7 +62,7 @@ export function checkAssignment (
                 node : {...node},
                 messageId : ruleCrash,
                 data : {
-                    message : err.message,
+                    message : err.message + "; stack: " + err.stack,
                 },
             });
         }
@@ -290,8 +290,9 @@ function checkAssignmentImpl (
         shallowSafe = true;
     }
     if (srcType.symbol.valueDeclaration != undefined) {
-        const srcParent = srcType.symbol.valueDeclaration.parent;
+        const srcParent : ts.Node|undefined = srcType.symbol.valueDeclaration.parent;
         if (
+            srcParent != undefined &&
             isAsExpression(srcParent) &&
             isTypeReferenceNode(srcParent.type) &&
             isIdentifier(srcParent.type.typeName) &&
