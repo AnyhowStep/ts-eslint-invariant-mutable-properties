@@ -114,6 +114,10 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
   There may be cases where it is wrong and I haven't thought of it yet.
 
++ Proper checking when index signatures and property signatures are present on destination type
+
+  Tests 30 and 31 show the rule thinking it is unsafe when it is safe.
+
 + More tests
 
 + Use more stable type-checking API
