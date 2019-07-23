@@ -1,0 +1,1 @@
+import "./rules/invariant-mutable-properties";
