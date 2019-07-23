@@ -190,6 +190,20 @@ function checkAssignmentImpl (
 
     //Special case for union src type
     if (isUnionType(srcType)) {
+        const expandedKey = (srcType as any).id + "-" + (dstType as any).id;
+        let expandedValue = expanded.get(expandedKey);
+        if (expandedValue != undefined) {
+            //console.log("Already seen " + expandedKey, expandedValue);
+            addOffendingProperties(
+                offendingProperties,
+                prefix,
+                expandedValue
+            );
+            return;
+        }
+        expandedValue = [];
+        expanded.set(expandedKey, expandedValue);
+
         //console.log("srcUnion", srcType.types.length);
         for (const srcTypeEle of srcType.types) {
             if (!isObjectOrUnionOrIntersectionType(srcTypeEle)) {
@@ -209,6 +223,7 @@ function checkAssignmentImpl (
                 return;
             }
             if (isSubType) {
+                const subExpandedValue : string[] = [];
                 checkAssignmentImpl(
                     context,
                     options,
@@ -218,11 +233,21 @@ function checkAssignmentImpl (
                     node,
                     dst,
                     srcTypeEle,
-                    prefix,
-                    offendingProperties,
+                    [],
+                    subExpandedValue,
                     dstPath,
                     srcPath,
                     sharedState
+                );
+                addOffendingProperties(
+                    offendingProperties,
+                    prefix,
+                    subExpandedValue
+                );
+                addOffendingProperties(
+                    expandedValue,
+                    [],
+                    subExpandedValue
                 );
             }
         }
