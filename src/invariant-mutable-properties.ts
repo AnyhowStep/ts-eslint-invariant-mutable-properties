@@ -155,7 +155,6 @@ const rule = createRule<Options, MessageId>({
                 for (let paramIndex=0; paramIndex<params.length; ++paramIndex) {
                     const param = params[paramIndex];
                     if (!isParameterDeclaration(param.valueDeclaration)) {
-                        console.log("THEN")
                         //Why is this not a parameter declaration?
                         useCallSignature = false;
                         break;
@@ -166,7 +165,6 @@ const rule = createRule<Options, MessageId>({
                         param.valueDeclaration.questionToken == undefined &&
                         param.valueDeclaration.dotDotDotToken == undefined
                     ) {
-                        console.log("WELL")
                         //Missing argument, not optional, not rest
                         useCallSignature = false;
                         break;

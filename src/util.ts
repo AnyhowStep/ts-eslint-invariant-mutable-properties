@@ -96,17 +96,21 @@ export function isHeritageOfId (typeChecker : ts.TypeChecker, heritageType: ts.E
     return false;
 }
 export function unwrapArrayType (type : ts.Type) : ts.Type {
+    const typeConstraint = type.getConstraint();
+    if (typeConstraint != undefined) {
+        type = typeConstraint;
+    }
     if (
         (type as any).typeParameters != undefined &&
-        (type as any).typeParameters.length == 1
+        (type as any).typeParameters.length > 0
     ) {
         return (type as any).typeParameters[0];
     }
     if (
         (type as any).typeArguments != undefined &&
-        (type as any).typeArguments.length == 1
+        (type as any).typeArguments.length > 0
     ) {
         return (type as any).typeArguments[0];
     }
-    throw new Error(`Cannot unwrap array type`);
+    return type;
 }
