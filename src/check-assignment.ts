@@ -463,6 +463,134 @@ function checkAssignmentImpl (
         }
     }
 
+    const checkedPropertyNames = new Set<string>();
+
+    for (const dstProp of dstType.getProperties()) {
+        const srcProp = srcType.getProperty(dstProp.name);
+        if (srcProp == undefined) {
+            //src does not have prop
+            continue;
+        }
+        checkedPropertyNames.add(dstProp.name);
+        /**
+         * The `.d.ts` says `dstProp.valueDeclaration` is never `undefined`.
+         * It is wrong.
+         */
+        let dstPropValueDeclaration : ts.Declaration|undefined = dstProp.valueDeclaration;
+        if (dstPropValueDeclaration == undefined) {
+            if ((dstProp as any).syntheticOrigin != undefined) {
+                dstPropValueDeclaration = (dstProp as any).syntheticOrigin.valueDeclaration;
+            }
+        }
+
+        const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
+        const dstPropType : ts.Type = (
+            dstPropValueDeclaration == undefined ?
+            typeChecker.getDeclaredTypeOfSymbol(dstProp) :
+            typeChecker.getTypeAtLocation(dstPropValueDeclaration)
+        );
+        if (
+            isObjectOrUnionOrIntersectionType(dstPropType) &&
+            isObjectOrUnionOrIntersectionType(srcPropType)
+        ) {
+            const subExpandedValue : string[] = [];
+            checkAssignmentImpl(
+                context,
+                options,
+                expanded,
+                assignabilityCache,
+                typeChecker,
+                node,
+                dstPropType,
+                (
+                    ((srcProp.valueDeclaration as any).initializer == undefined) ?
+                    srcPropType :
+                    /**
+                     * This is undocumented but exists.
+                     *
+                     * If `srcProp.valueDeclaration` if of `kind`
+                     * `SyntaxKind.PropertyAssignment`,
+                     *
+                     * then it has the undocumented property `initializer`.
+                     * This `initializer` can possibly be of `kind`
+                     * `SyntaxKind.ArrayLiteralExpression` or
+                     * `SyntaxKind.ObjectLiteralExpression`
+                     */
+                    (srcProp.valueDeclaration as any).initializer
+                ),
+                [dstProp.name],
+                subExpandedValue,
+                dstPath,
+                srcPath,
+                sharedState
+            );
+            addOffendingProperties(
+                offendingProperties,
+                prefix,
+                subExpandedValue
+            );
+            addOffendingProperties(
+                expandedValue,
+                [],
+                subExpandedValue
+            );
+            if (srcPropType.getCallSignatures().length == 0) {
+                continue;
+            }
+        }
+
+        if (
+            dstPropValueDeclaration != undefined &&
+            dstPropValueDeclaration.modifiers != undefined &&
+            dstPropValueDeclaration.modifiers.some(m => m.kind == ts.SyntaxKind.ReadonlyKeyword)
+        ) {
+            continue;
+        }
+
+        if (shallowSafe) {
+            continue;
+        }
+
+        /**
+         * @todo This needs to be tested more
+         */
+        if (isMappedType(dstType) && dstType.declaration.readonlyToken != undefined) {
+            continue;
+        }
+
+        const srcSubTypeOfDst = isSubTypeOf(
+            context,
+            options,
+            assignabilityCache,
+            node,
+            srcPropType,
+            dstPropType,
+            typeChecker
+        );
+        if (srcSubTypeOfDst == undefined) {
+            //ts-simple-type crashed
+            return;
+        }
+        const dstSubTypeOfSrc = isSubTypeOf(
+            context,
+            options,
+            assignabilityCache,
+            node,
+            dstPropType,
+            srcPropType,
+            typeChecker
+        );
+        if (dstSubTypeOfSrc == undefined) {
+            //ts-simple-type crashed
+            return;
+        }
+
+        if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
+            addOffendingProperty(offendingProperties, [...prefix, dstProp.name].join("."));
+            addOffendingProperty(expandedValue, [dstProp.name].join("."));
+        }
+    }
+
     const dstNumberIndexInfo = typeChecker.getIndexInfoOfType(dstType, ts.IndexKind.Number);
     const dstNumberIndexType = dstType.getNumberIndexType();
     if (
@@ -542,6 +670,11 @@ function checkAssignmentImpl (
                 //Only check numeric properties
                 continue;
             }
+            if (checkedPropertyNames.has(srcProp.name)) {
+                continue;
+            }
+            checkedPropertyNames.add(srcProp.name);
+
             const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
             if (
                 isObjectOrUnionOrIntersectionType(dstNumberIndexType) &&
@@ -753,6 +886,11 @@ function checkAssignmentImpl (
         }
 
         for (const srcProp of srcType.getProperties()) {
+            if (checkedPropertyNames.has(srcProp.name)) {
+                continue;
+            }
+            checkedPropertyNames.add(srcProp.name);
+
             const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
             if (
                 isObjectOrUnionOrIntersectionType(dstStringIndexType) &&
@@ -817,131 +955,6 @@ function checkAssignmentImpl (
                     addOffendingProperty(expandedValue, "[string]/"+srcProp.name);
                 }
             }
-        }
-    }
-
-    for (const dstProp of dstType.getProperties()) {
-        const srcProp = srcType.getProperty(dstProp.name);
-        if (srcProp == undefined) {
-            //src does not have prop
-            continue;
-        }
-        /**
-         * The `.d.ts` says `dstProp.valueDeclaration` is never `undefined`.
-         * It is wrong.
-         */
-        let dstPropValueDeclaration : ts.Declaration|undefined = dstProp.valueDeclaration;
-        if (dstPropValueDeclaration == undefined) {
-            if ((dstProp as any).syntheticOrigin != undefined) {
-                dstPropValueDeclaration = (dstProp as any).syntheticOrigin.valueDeclaration;
-            }
-        }
-
-        const srcPropType = typeChecker.getTypeAtLocation(srcProp.valueDeclaration);
-        const dstPropType : ts.Type = (
-            dstPropValueDeclaration == undefined ?
-            typeChecker.getDeclaredTypeOfSymbol(dstProp) :
-            typeChecker.getTypeAtLocation(dstPropValueDeclaration)
-        );
-        if (
-            isObjectOrUnionOrIntersectionType(dstPropType) &&
-            isObjectOrUnionOrIntersectionType(srcPropType)
-        ) {
-            const subExpandedValue : string[] = [];
-            checkAssignmentImpl(
-                context,
-                options,
-                expanded,
-                assignabilityCache,
-                typeChecker,
-                node,
-                dstPropType,
-                (
-                    ((srcProp.valueDeclaration as any).initializer == undefined) ?
-                    srcPropType :
-                    /**
-                     * This is undocumented but exists.
-                     *
-                     * If `srcProp.valueDeclaration` if of `kind`
-                     * `SyntaxKind.PropertyAssignment`,
-                     *
-                     * then it has the undocumented property `initializer`.
-                     * This `initializer` can possibly be of `kind`
-                     * `SyntaxKind.ArrayLiteralExpression` or
-                     * `SyntaxKind.ObjectLiteralExpression`
-                     */
-                    (srcProp.valueDeclaration as any).initializer
-                ),
-                [dstProp.name],
-                subExpandedValue,
-                dstPath,
-                srcPath,
-                sharedState
-            );
-            addOffendingProperties(
-                offendingProperties,
-                prefix,
-                subExpandedValue
-            );
-            addOffendingProperties(
-                expandedValue,
-                [],
-                subExpandedValue
-            );
-            if (srcPropType.getCallSignatures().length == 0) {
-                continue;
-            }
-        }
-
-        if (
-            dstPropValueDeclaration != undefined &&
-            dstPropValueDeclaration.modifiers != undefined &&
-            dstPropValueDeclaration.modifiers.some(m => m.kind == ts.SyntaxKind.ReadonlyKeyword)
-        ) {
-            continue;
-        }
-
-        if (shallowSafe) {
-            continue;
-        }
-
-        /**
-         * @todo This needs to be tested more
-         */
-        if (isMappedType(dstType) && dstType.declaration.readonlyToken != undefined) {
-            continue;
-        }
-
-        const srcSubTypeOfDst = isSubTypeOf(
-            context,
-            options,
-            assignabilityCache,
-            node,
-            srcPropType,
-            dstPropType,
-            typeChecker
-        );
-        if (srcSubTypeOfDst == undefined) {
-            //ts-simple-type crashed
-            return;
-        }
-        const dstSubTypeOfSrc = isSubTypeOf(
-            context,
-            options,
-            assignabilityCache,
-            node,
-            dstPropType,
-            srcPropType,
-            typeChecker
-        );
-        if (dstSubTypeOfSrc == undefined) {
-            //ts-simple-type crashed
-            return;
-        }
-
-        if (srcSubTypeOfDst && !dstSubTypeOfSrc) {
-            addOffendingProperty(offendingProperties, [...prefix, dstProp.name].join("."));
-            addOffendingProperty(expandedValue, [dstProp.name].join("."));
         }
     }
 }

@@ -126,6 +126,12 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
   `ts-simple-type` crashes with generic functions and complex types often, at the moment.
 
++ Clean up and stop copy-pasting code.
+
++ Use better data structures.
+
++ Not brute force everything.
+
 -----
 
 The rule does not handle generics properly yet,
