@@ -23,8 +23,11 @@ export function isTypeReferenceNode (node : ts.Node) : node is ts.TypeReferenceN
 export function isIdentifier (entityName : ts.EntityName) : entityName is ts.Identifier {
     return entityName.kind == ts.SyntaxKind.Identifier;
 }
-export function isParameterDeclaration (declaration : ts.Declaration) : declaration is ts.ParameterDeclaration {
-    return declaration.kind == ts.SyntaxKind.Parameter;
+export function isParameterDeclaration (declaration : ts.Declaration|ts.Node|ts.Type) : declaration is ts.ParameterDeclaration {
+    return (
+        (declaration as any).kind != undefined &&
+        (declaration as any).kind == ts.SyntaxKind.Parameter
+    );
 }
 export function isUnionType (typeOrNode : ts.Type|TSNode) : typeOrNode is UnionType {
     return (

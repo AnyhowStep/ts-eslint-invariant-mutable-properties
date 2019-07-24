@@ -20,7 +20,8 @@ import {
     isIntersectionType,
     isObjectOrUnionOrIntersectionType,
     hasHeritageClauses,
-    isHeritageOfId
+    isHeritageOfId,
+    isParameterDeclaration
 } from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options} from "./options";
@@ -601,7 +602,12 @@ function checkAssignmentImpl (
     if (
         dstNumberIndexInfo != undefined &&
         dstNumberIndexType != undefined &&
-        !dstNumberIndexInfo.isReadonly
+        !dstNumberIndexInfo.isReadonly &&
+        //Is rest parameter of a function?
+        (
+            !isParameterDeclaration(dst) ||
+            dst.dotDotDotToken == undefined
+        )
     ) {
         const srcNumberIndexType = srcType.getNumberIndexType();
         if (srcNumberIndexType != undefined) {
@@ -778,7 +784,12 @@ function checkAssignmentImpl (
     if (
         dstStringIndexInfo != undefined &&
         dstStringIndexType != undefined &&
-        !dstStringIndexInfo.isReadonly
+        !dstStringIndexInfo.isReadonly &&
+        //Is rest parameter of a function?
+        (
+            !isParameterDeclaration(dst) ||
+            dst.dotDotDotToken == undefined
+        )
     ) {
         const srcNumberIndexType = srcType.getNumberIndexType();
 
