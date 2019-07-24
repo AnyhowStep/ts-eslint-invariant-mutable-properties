@@ -132,6 +132,8 @@ See [tests](test/src/rules/invariant-mutable-properties.ts) for more examples.
 
 + Not brute force everything.
 
++ Clean up boolean expressions
+
 -----
 
 The rule does not handle generics properly yet,

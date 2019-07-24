@@ -534,7 +534,12 @@ function checkAssignmentImpl (
                 [],
                 subExpandedValue
             );
-            if (srcPropType.getCallSignatures().length == 0) {
+
+            if (
+                isObjectType(srcPropType) &&
+                srcPropType.getCallSignatures().length == 0 &&
+                isObjectType(dstPropType)
+            ) {
                 continue;
             }
         }
@@ -630,7 +635,20 @@ function checkAssignmentImpl (
                     [],
                     subExpandedValue
                 );
-            } else if (!shallowSafe) {
+            }
+
+            if (
+                !shallowSafe &&
+                (
+                    !(
+                        isObjectType(srcNumberIndexType) &&
+                        srcNumberIndexType.getCallSignatures().length == 0
+                    ) ||
+                    (
+                        !isObjectType(dstNumberIndexType)
+                    )
+                )
+            ) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
@@ -706,7 +724,20 @@ function checkAssignmentImpl (
                     [],
                     subExpandedValue
                 );
-            } else if (!shallowSafe) {
+            }
+
+            if (
+                !shallowSafe &&
+                (
+                    !(
+                        isObjectType(srcPropType) &&
+                        srcPropType.getCallSignatures().length == 0
+                    ) ||
+                    (
+                        !isObjectType(dstNumberIndexType)
+                    )
+                )
+            ) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
@@ -782,7 +813,20 @@ function checkAssignmentImpl (
                     [],
                     subExpandedValue
                 );
-            } else if (!shallowSafe) {
+            }
+
+            if (
+                !shallowSafe &&
+                (
+                    !(
+                        isObjectType(srcNumberIndexType) &&
+                        srcNumberIndexType.getCallSignatures().length == 0
+                    ) ||
+                    (
+                        !isObjectType(dstStringIndexType)
+                    )
+                )
+            ) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
@@ -850,7 +894,20 @@ function checkAssignmentImpl (
                     [],
                     subExpandedValue
                 );
-            } else if (!shallowSafe) {
+            }
+
+            if (
+                !shallowSafe &&
+                (
+                    !(
+                        isObjectType(srcStringIndexType) &&
+                        srcStringIndexType.getCallSignatures().length == 0
+                    ) ||
+                    (
+                        !isObjectType(dstStringIndexType)
+                    )
+                )
+            ) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,
@@ -922,7 +979,20 @@ function checkAssignmentImpl (
                     [],
                     subExpandedValue
                 );
-            } else if (!shallowSafe) {
+            }
+
+            if (
+                !shallowSafe &&
+                (
+                    !(
+                        isObjectType(srcPropType) &&
+                        srcPropType.getCallSignatures().length == 0
+                    ) ||
+                    (
+                        !isObjectType(dstStringIndexType)
+                    )
+                )
+            ) {
                 const srcSubTypeOfDst = isSubTypeOf(
                     context,
                     options,

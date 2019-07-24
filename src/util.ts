@@ -71,6 +71,7 @@ export function hasHeritageClauses (declaration : ts.Declaration) : declaration 
 }
 
 export function isHeritageOfId (typeChecker : ts.TypeChecker, heritageType: ts.ExpressionWithTypeArguments, id : number) : boolean {
+    //eslint-disable-next-line local/invariant-mutable-properties
     const type = typeChecker.getTypeAtLocation(heritageType);
     if (type == undefined) {
         return false;
