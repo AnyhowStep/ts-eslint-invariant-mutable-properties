@@ -34,7 +34,7 @@ let dst : { y : { x : number|string } } = src;
      */
     invalid : [
         /**
-         * When `ts-simple-type` is fixed,
+         * @todo When `ts-simple-type` is fixed,
          * update package and update this test
          */
         /*{

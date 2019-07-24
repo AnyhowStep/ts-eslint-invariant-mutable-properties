@@ -2,6 +2,7 @@ import rule from "../../../src/invariant-mutable-properties";
 import {mutablePropertiesAreInvariant} from "../../../src/message-ids";
 import {RuleTester} from "../RuleTester";
 import {rootPath} from "../root-path";
+import {getDefaultOptions} from "../../../src/options";
 
 const ruleTester = new RuleTester({
     parser : "@typescript-eslint/parser",
@@ -243,21 +244,6 @@ dst.x = "hi"; //Boom, src.x now has string instead of number
         },
         {
             code : (`
-declare const src : string[];
-const dst : (string|number)[] = src;
-dst.push(9001); //Boom, src[number] now has number instead of string
-            `),
-            errors : [
-                {
-                    messageId : mutablePropertiesAreInvariant,
-                    data : { properties: "[number]" },
-                    line : 3,
-                    column : 11,
-                },
-            ],
-        },
-        {
-            code : (`
 declare const src : { x : number };
 
 function foo (dst? : { x : number|string }) : void {
@@ -269,6 +255,12 @@ function foo (dst? : { x : number|string }) : void {
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -291,6 +283,12 @@ function foo (dst? : (string|number)[]) : void {
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -369,6 +367,12 @@ declare function foo (arg? : typeof dst) : void;
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -392,6 +396,12 @@ declare function foo (arg? : typeof dst) : void;
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -415,6 +425,12 @@ declare function foo (arg? : typeof dst) : void;
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -438,6 +454,12 @@ declare function foo (arg? : typeof dst) : void;
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,
@@ -461,6 +483,12 @@ declare function foo (arg? : typeof dst) : void;
 foo(src);
 foo();
             `),
+            options : [
+                {
+                    ...getDefaultOptions()[0],
+                    reportTsSimpleTypeCrash : true,
+                }
+            ],
             errors : [
                 {
                     messageId : mutablePropertiesAreInvariant,

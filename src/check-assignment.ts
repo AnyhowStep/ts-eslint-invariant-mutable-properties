@@ -21,7 +21,8 @@ import {
     isObjectOrUnionOrIntersectionType,
     hasHeritageClauses,
     isHeritageOfId,
-    isParameterDeclaration
+    isParameterDeclaration,
+    unwrapArrayType
 } from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options} from "./options";
@@ -173,6 +174,15 @@ function checkAssignmentImpl (
         dst :
         isIntersectionType(dst) ?
         dst :
+        isParameterDeclaration(dst) ?
+        (
+            dst.dotDotDotToken == undefined ?
+            typeChecker.getTypeAtLocation({...dst}) :
+            //Should give us the `T` of `Array<T>`
+            unwrapArrayType(typeChecker.getTypeAtLocation({
+                ...dst,
+            }))
+        ) :
         typeChecker.getTypeAtLocation(dst)
     );
     const dstTypeConstraint = dstType.getConstraint();

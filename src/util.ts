@@ -95,3 +95,18 @@ export function isHeritageOfId (typeChecker : ts.TypeChecker, heritageType: ts.E
     }
     return false;
 }
+export function unwrapArrayType (type : ts.Type) : ts.Type {
+    if (
+        (type as any).typeParameters != undefined &&
+        (type as any).typeParameters.length == 1
+    ) {
+        return (type as any).typeParameters[0];
+    }
+    if (
+        (type as any).typeArguments != undefined &&
+        (type as any).typeArguments.length == 1
+    ) {
+        return (type as any).typeArguments[0];
+    }
+    throw new Error(`Cannot unwrap array type`);
+}

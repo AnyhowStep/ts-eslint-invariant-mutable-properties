@@ -1,9 +1,9 @@
 import {TSESTree} from "@typescript-eslint/experimental-utils";
 import * as util from "@typescript-eslint/experimental-utils/dist/eslint-utils";
 import {getParserServices} from "./get-parser-services";
-import {MessageId} from "./message-ids";
+import {MessageId, tsSimpleTypeCrash} from "./message-ids";
 import {checkAssignment} from "./check-assignment";
-import {isParameterDeclaration} from "./util";
+import {isParameterDeclaration, unwrapArrayType} from "./util";
 import {isSubTypeOf} from "./is-sub-type-of";
 import {Options, getDefaultOptions} from "./options";
 const createRule = util.RuleCreator(ruleName => ruleName);
@@ -122,19 +122,52 @@ const rule = createRule<Options, MessageId>({
         function checkCallExpression (node: TSESTree.CallExpression) : void {
             const calleeNode = service.esTreeNodeToTSNodeMap.get(node.callee);
             const calleeType = typeChecker.getTypeAtLocation(calleeNode);
+            if (calleeType.getCallSignatures().length == 0) {
+                //No call signatures
+                return;
+            }
             for (const callSignature of calleeType.getCallSignatures()) {
+                /**
+                 * @todo Proper support for rest params
+                 */
                 const params = callSignature.getParameters();
+                if (params.length == 0) {
+                    if (node.arguments.length > 0) {
+                        //Can't call a function of zero param using one or more args
+                        continue;
+                    } else {
+                        //There is no way calling this will fail
+                        return;
+                    }
+                }
+                //params.length > 0 now
+                const lastParam = params[params.length-1];
+                if (!isParameterDeclaration(lastParam.valueDeclaration)) {
+                    //Why is this not a parameter declaration?
+                    continue;
+                }
+                const lastIsRest = lastParam.valueDeclaration.dotDotDotToken != undefined;
+                if (node.arguments.length > params.length && !lastIsRest) {
+                    continue;
+                }
+                //Now, args.length <= params.length OR lastIsRest
                 let useCallSignature = true;
                 for (let paramIndex=0; paramIndex<params.length; ++paramIndex) {
                     const param = params[paramIndex];
                     if (!isParameterDeclaration(param.valueDeclaration)) {
+                        console.log("THEN")
                         //Why is this not a parameter declaration?
                         useCallSignature = false;
                         break;
                     }
                     const arg : TSESTree.Expression|undefined = node.arguments[paramIndex];
-                    if (arg == undefined && param.valueDeclaration.questionToken == undefined) {
-                        //Missing argument, not optional
+                    if (
+                        arg == undefined &&
+                        param.valueDeclaration.questionToken == undefined &&
+                        param.valueDeclaration.dotDotDotToken == undefined
+                    ) {
+                        console.log("WELL")
+                        //Missing argument, not optional, not rest
                         useCallSignature = false;
                         break;
                     }
@@ -149,9 +182,16 @@ const rule = createRule<Options, MessageId>({
                         typeChecker.getTypeAtLocation(service.esTreeNodeToTSNodeMap.get(arg)),
                         //This commented out line, if used, causes the invariant-mutable-properties error!
                         //typeChecker.getTypeAtLocation(param.valueDeclaration),
-                        typeChecker.getTypeAtLocation({
-                            ...param.valueDeclaration,
-                        }),
+                        (
+                            (param.valueDeclaration.dotDotDotToken == undefined) ?
+                            typeChecker.getTypeAtLocation({
+                                ...param.valueDeclaration,
+                            }) :
+                            //Should give us the `T` of `Array<T>`
+                            unwrapArrayType(typeChecker.getTypeAtLocation({
+                                ...param.valueDeclaration,
+                            }))
+                        ),
                         typeChecker
                     );
                     if (isSubType == undefined) {
@@ -164,6 +204,34 @@ const rule = createRule<Options, MessageId>({
                         break;
                     }
                 }
+                for (let argIndex=params.length; argIndex<node.arguments.length; ++argIndex) {
+                    const arg : TSESTree.Expression|undefined = node.arguments[argIndex];
+                    if (arg == undefined) {
+                        break;
+                    }
+                    const isSubType = isSubTypeOf(
+                        context,
+                        options,
+                        assignabilityCache,
+                        arg,
+                        typeChecker.getTypeAtLocation(service.esTreeNodeToTSNodeMap.get(arg)),
+                        //Should give us the `T` of `Array<T>`
+                        unwrapArrayType(typeChecker.getTypeAtLocation({
+                            ...lastParam.valueDeclaration,
+                        })),
+                        typeChecker
+                    );
+                    if (isSubType == undefined) {
+                        //ts-simple-type crashed
+                        return;
+                    }
+                    if (!isSubType) {
+                        //arg not assignable to param
+                        useCallSignature = false;
+                        break;
+                    }
+                }
+
                 if (useCallSignature) {
                     for (let paramIndex=0; paramIndex<params.length; ++paramIndex) {
                         const param = params[paramIndex];
@@ -186,8 +254,34 @@ const rule = createRule<Options, MessageId>({
                             service.esTreeNodeToTSNodeMap.get(arg)
                         );
                     }
-                    break;
+                    for (let argIndex=params.length; argIndex<node.arguments.length; ++argIndex) {
+                        const arg : TSESTree.Expression|undefined = node.arguments[argIndex];
+                        if (arg == undefined) {
+                            break;
+                        }
+                        checkAssignment(
+                            context,
+                            options,
+                            expanded,
+                            assignabilityCache,
+                            typeChecker,
+                            arg,
+                            lastParam.valueDeclaration,
+                            service.esTreeNodeToTSNodeMap.get(arg)
+                        );
+                    }
+                    return;
                 }
+            }
+
+            if (options[0].reportTsSimpleTypeCrash) {
+                context.report({
+                    node : {...node},
+                    messageId : tsSimpleTypeCrash,
+                    data : {
+                        message : `ts-simple-type does not think any call signatures are callable`,
+                    },
+                });
             }
         }
 
